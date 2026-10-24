@@ -34,3 +34,7 @@ Illustrative photos downloaded from Unsplash image IDs: `1519741497674-611481863
 Sample films from Mixkit: [Just married couple](https://mixkit.co/free-stock-video/just-married-couple-40599/) and [Newlyweds walking through a garden](https://mixkit.co/free-stock-video/newlyweds-walking-through-a-garden-40584/). Review the asset-specific [Mixkit license](https://mixkit.co/license/#videoFree) for the final client usage.
 
 Self-hosted typography: DM Sans and Italiana from Google Fonts (SIL Open Font License).
+
+## Cinematic revision
+
+The storyboard now uses three matching original AI-generated scenes: a coastal couple portrait, a male photographer aiming at the couple, and a close view of him operating his camera. The couple appears inside his lens before the flash. Scroll progress uses time-based interpolation; gallery reveals use IntersectionObserver. Four films include muted hover previews and a viewport-aware background preview. Gentle mode pauses continuous motion and previews. See [visual asset prompts and provenance](docs/visual-assets.md). Optimized WebP images are delivered instead of source PNGs.
