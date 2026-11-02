@@ -16,7 +16,7 @@ npm run typecheck
 npm run build
 ```
 
-The production site exports to `out/`. Serve it with any static host, or remove `output: 'export'` from `next.config.ts` to use Next.js server hosting. No server round trips are required for the scroll sequence. Images and fonts are local, video files use deferred loading, and desktop scroll updates use requestAnimationFrame and CSS transforms rather than per-frame React renders. On phones, the story keeps its pinned scroll animation with a shorter timeline and video previews stay paused.
+The production site exports to `out/`. Serve it with any static host, or remove `output: 'export'` from `next.config.ts` to use Next.js server hosting. No server round trips are required for the scroll sequence. Images and fonts are local, video files use deferred loading, and desktop scroll updates use requestAnimationFrame and CSS transforms rather than per-frame React renders. On phones, the pinned story uses a shorter timeline, the ambient video plays only while visible, and film cards autoplay a muted preview while visible; tapping opens the player with controls.
 
 ## Client handoff
 

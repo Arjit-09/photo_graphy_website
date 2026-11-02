@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, ArrowDown, ArrowRight, ArrowLeft, Aperture, Play, X, Menu, Plus, Minus, Mail, Phone } from 'lucide-react';
+import { ArrowUpRight, ArrowDown, ArrowRight, ArrowLeft, Aperture, Play, Pause, X, Menu, Plus, Minus, Mail, Phone } from 'lucide-react';
 
 const photos = [
   { src: 'intimate-wedding', title: 'The art of together', category: 'Weddings', label: 'A day, a thousand little stories' },
@@ -32,6 +32,7 @@ export default function Home() {
   const [album, setAlbum] = useState(0);
   const albumPage = useRef<HTMLDivElement>(null);
   const [turning, setTurning] = useState(false);
+  const [filmPreview, setFilmPreview] = useState<string | null>(null);
   const [motion, setMotion] = useState(true);
   const [compact, setCompact] = useState(false);
   const [faq, setFaq] = useState<number | null>(null);
@@ -61,13 +62,54 @@ export default function Home() {
     const videos = document.querySelectorAll<HTMLVideoElement>('[data-ambient]');
     const videoObserver = new IntersectionObserver(entries => entries.forEach(entry => {
       const video = entry.target as HTMLVideoElement;
-      if (entry.isIntersecting && motion && !compact && !document.hidden) video.play().catch(()=>{}); else video.pause();
+      if (entry.isIntersecting && motion && !document.hidden) video.play().catch(()=>{}); else video.pause();
     }), {threshold:.2});
     videos.forEach(video => videoObserver.observe(video));
-    const pauseHidden = () => {if(document.hidden) videos.forEach(v=>v.pause());};
-    document.addEventListener('visibilitychange',pauseHidden);
-    return () => {observer.disconnect(); videoObserver.disconnect();document.removeEventListener('visibilitychange',pauseHidden);videos.forEach(v=>v.pause());};
+    const syncVideoVisibility = () => videos.forEach(video => {
+      if (document.hidden || !motion) { video.pause(); return; }
+      const rect = video.getBoundingClientRect();
+      if (rect.top < window.innerHeight * .8 && rect.bottom > window.innerHeight * .2) video.play().catch(()=>{});
+      else video.pause();
+    });
+    document.addEventListener('visibilitychange',syncVideoVisibility);
+    return () => {observer.disconnect(); videoObserver.disconnect();document.removeEventListener('visibilitychange',syncVideoVisibility);videos.forEach(v=>v.pause());};
   }, [motion, filter, compact]);
+  useEffect(() => {
+    if (!compact) return;
+    const cards = Array.from(document.querySelectorAll<HTMLButtonElement>('.photo-card'));
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => entry.target.classList.toggle('touch-active', entry.isIntersecting && entry.intersectionRatio >= .45));
+    }, { threshold: [.15, .45, .7] });
+    cards.forEach(card => observer.observe(card));
+    return () => { observer.disconnect(); cards.forEach(card => card.classList.remove('touch-active')); };
+  }, [compact, filter]);
+  useEffect(() => {
+    if (!compact || !motion || modal?.kind) return;
+    const cards = Array.from(document.querySelectorAll<HTMLButtonElement>('.film-card'));
+    const visibility = new Map<HTMLButtonElement, number>(cards.map(card => [card, 0] as const));
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => visibility.set(entry.target as HTMLButtonElement, entry.isIntersecting ? entry.intersectionRatio : 0));
+      let active: HTMLButtonElement | null = null;
+      let activeRatio = 0;
+      visibility.forEach((ratio, card) => {
+        if (ratio > activeRatio) { active = card; activeRatio = ratio; }
+      });
+      if (!active || activeRatio < .12 || document.hidden) {
+        cards.forEach(card => card.querySelector('video')?.pause());
+        setFilmPreview(null);
+        return;
+      }
+      const activeCard = active as HTMLButtonElement;
+      cards.forEach(card => {
+        const video = card.querySelector('video');
+        if (card === activeCard) video?.play().catch(() => {});
+        else video?.pause();
+      });
+      setFilmPreview(activeCard.dataset.film ?? null);
+    }, { threshold: [.12, .25, .5, .75] });
+    cards.forEach(card => observer.observe(card));
+    return () => { observer.disconnect(); cards.forEach(card => card.querySelector('video')?.pause()); };
+  }, [compact, motion, modal?.kind]);
   useEffect(() => {
     let raf = 0, displayed = -1, lastTime = 0, lastChapter = -1;
     const update = (time = performance.now()) => {
@@ -173,12 +215,12 @@ export default function Home() {
 
       <div className="manifesto"><span className="eyebrow">A MOMENT PASSES. A PHOTOGRAPH STAYS.</span><p>For the beautifully imperfect.<br/>The wildly in love. <em>The wonderfully you.</em></p><Aperture size={30} strokeWidth={1}/></div>
 
-      <div className="moving-gallery" aria-label="A moving collection of photographs"><div className="moving-track">{(compact?[0]:[0,1]).map(copy=><div className="moving-set" key={copy} aria-hidden={copy===1}>{['couple-editorial.webp','intimate-wedding','love','portrait','landscape'].map((src,i)=><figure key={src}><img src={media(src)} alt={copy===0?['A coastal love story','An intimate wedding','An embrace','An editorial portrait','A wild landscape'][i]:''} loading="lazy"/><figcaption>0{i+1} / {['THE FEELING','THE PROMISE','THE IN-BETWEEN','THE INDIVIDUAL','THE ADVENTURE'][i]}</figcaption></figure>)}</div>)}</div></div>
+      <div className="moving-gallery" aria-label="A moving collection of photographs"><div className="moving-track">{[0,1].map(copy=><div className="moving-set" key={copy} aria-hidden={copy===1}>{['couple-editorial.webp','intimate-wedding','love','portrait','landscape'].map((src,i)=><figure key={src}><img src={media(src)} alt={copy===0?['A coastal love story','An intimate wedding','An embrace','An editorial portrait','A wild landscape'][i]:''} loading="lazy"/><figcaption>0{i+1} / {['THE FEELING','THE PROMISE','THE IN-BETWEEN','THE INDIVIDUAL','THE ADVENTURE'][i]}</figcaption></figure>)}</div>)}</div></div>
 
       <section className="work section" id="work"><div className="section-heading"><div><p className="eyebrow">01 / SELECTED STORIES</p><h2>Life happens.<br/><em>We keep the feeling.</em></h2></div><p>A collection of honest moments,<br/>told in light, colour, and a little magic.</p></div><div className="work-toolbar"><div className="filters" aria-label="Filter photography">{['All stories','Weddings','Couples','Portraits','Travel'].map(f=><button key={f} onClick={()=>setFilter(f)} aria-pressed={filter===f} className={filter===f?'selected':''}>{f}{f==='All stories'&&<sup>06</sup>}</button>)}</div><span className="collection-note">THE STILL COLLECTION ↙</span></div><div className="photo-grid">{photos.map((p,i)=>(filter==='All stories'||filter===p.category)&&<button className={'photo-card photo-'+i} key={p.src} onClick={()=>setModal({kind:'photo',index:i})}><div className="photo-wrap"><img src={media(p.src)} alt={p.title} loading="lazy"/><span className="photo-open"><ArrowUpRight/></span><span className="photo-category">{p.category}</span></div><div className="photo-caption"><div><h3>{p.title}</h3><p>{p.label}</p></div><span>0{i+1}</span></div></button>)}</div><p className="demo-note">An editorial moodboard · Original AI concept imagery & stock photography.</p></section>
 
       <section className="cinema-interlude" aria-label="Wedding film preview"><video data-ambient muted loop playsInline preload="none" poster="/media/love.jpg" src="/media/garden-film.mp4"/><div className="cinema-shade"/><div className="cinema-copy"><p className="eyebrow">NOT A POSE. A PULSE.</p><h2>Life doesn’t<br/><em>stand still.</em></h2><button className="round-link" onClick={()=>setModal({kind:'film',index:1})}><span className="play-ring"><Play size={16}/></span>NEITHER DO OUR STORIES</button></div><span className="cinema-edge">THE MOTION COLLECTION / 2026</span><button className="ambient-toggle" onClick={()=>setMotion(!motion)}>{motion?'Pause motion':'Play motion'}</button></section>
-      <section className="films section" id="films"><div className="section-heading"><div><p className="eyebrow">02 / STORIES IN MOTION</p><h2>Some feelings<br/><em>need more than a frame.</em></h2></div><span>HOVER TO FEEL IT. PRESS PLAY TO STAY.</span></div><div className="film-grid">{films.map((film,i)=><button className="film-card" key={film.src} onClick={()=>setModal({kind:'film',index:i})} onMouseEnter={e=>{if(motion&&window.matchMedia('(hover: hover)').matches){const v=e.currentTarget.querySelector('video');v?.play().catch(()=>{});}}} onMouseLeave={e=>e.currentTarget.querySelector('video')?.pause()}><img src={media(film.poster)} alt={film.title} loading="lazy"/><video muted loop playsInline preload="none" src={`/media/${film.src}.mp4`} aria-hidden="true"/><span className="film-tint"/><span className="film-play"><Play size={23} strokeWidth={1} fill="currentColor"/></span><span className="film-details"><span><small>{film.tag} · 0{i+1}</small><strong>{film.title}</strong></span><ArrowUpRight/></span></button>)}</div><p className="demo-note">Sample films · Stock footage for this concept</p></section>
+      <section className="films section" id="films"><div className="section-heading"><div><p className="eyebrow">02 / STORIES IN MOTION</p><h2>Some feelings<br/><em>need more than a frame.</em></h2></div><span>{compact?'TAP TO PREVIEW. TAP AGAIN TO OPEN.':'HOVER TO FEEL IT. PRESS PLAY TO STAY.'}</span></div><div className="film-grid">{films.map((film,i)=><button className={`film-card${filmPreview===film.src?' previewing':''}`} key={film.src} data-film={film.src} aria-label={`${filmPreview===film.src?'Open':'Preview'} ${film.title}`} onClick={e=>{const video=e.currentTarget.querySelector('video');if(compact&&motion&&filmPreview!==film.src){document.querySelectorAll<HTMLVideoElement>('.film-card video').forEach(other=>{if(other!==video)other.pause();});setFilmPreview(film.src);video?.play().catch(()=>{setFilmPreview(null);setModal({kind:'film',index:i});});return;}video?.pause();setFilmPreview(null);setModal({kind:'film',index:i});}} onMouseEnter={e=>{if(motion&&window.matchMedia('(hover: hover)').matches){const v=e.currentTarget.querySelector('video');v?.play().catch(()=>{});}}} onMouseLeave={e=>{if(window.matchMedia('(hover: hover)').matches)e.currentTarget.querySelector('video')?.pause();}}><img src={media(film.poster)} alt="" loading="lazy"/><video muted loop playsInline preload="none" src={`/media/${film.src}.mp4`} aria-hidden="true"/><span className="film-tint"/><span className="film-play">{filmPreview===film.src?<Pause size={23} strokeWidth={1} fill="currentColor"/>:<Play size={23} strokeWidth={1} fill="currentColor"/>}</span><span className="film-details"><span><small>{compact?(filmPreview===film.src?'TAP TO OPEN FULL FILM':'TAP TO PREVIEW')+' · ':''}{film.tag} · 0{i+1}</small><strong>{film.title}</strong></span><ArrowUpRight/></span></button>)}</div><p className="demo-note">Sample films · Stock footage for this concept</p></section>
 
       <section className="about section" id="about"><div className="about-image"><img src="/media/photographer-editorial.webp" alt="A male photographer looking through his camera at golden hour" loading="lazy"/><span>ALWAYS CHASING THE FEELING.</span></div><div className="about-copy"><p className="eyebrow">03 / THE PEOPLE BEHIND THE LENS</p><h2>Less posing.<br/>More <em>being.</em></h2><p>We believe the most beautiful photographs happen when you forget there’s a camera. When you’re lost in a laugh, wrapped in a hug, or simply being yourself.</p><p>Our approach is simple: give you space to live the moment, and make something beautiful to remember it by.</p><button className="text-link" onClick={enquire}>Let’s tell your story <ArrowUpRight size={20}/></button><div className="values"><span>HONEST MOMENTS</span><span>THOUGHTFUL DETAILS</span><span>TIMELESS FEELING</span></div></div></section>
 
@@ -188,6 +230,6 @@ export default function Home() {
     </main>
     <footer><a className="wordmark" href="#"><img src="/media/beast-click-logo.svg" alt="" width="48" height="48"/><span>Beast <i>Click</i><small>WEDDINGS · PORTRAITS · FILMS</small></span></a><p>Made with feeling. Remembered forever.</p><div className="footer-contact"><a href="mailto:bcphotographer19@gmail.com"><Mail size={16}/>bcphotographer19@gmail.com</a><a href="tel:+918287545122"><Phone size={16}/>+91 82875 45122</a></div><a href="#story">Back to the beginning ↑</a><div className="footer-bottom"><span>© {new Date().getFullYear()} Beast Click</span><span>PHOTOGRAPHY & FILMS</span></div></footer>
 
-    <dialog ref={dialog} className={'modal '+(modal?.kind==='enquiry'?'enquiry-modal':'')} onCancel={close} onClick={e=>{if(e.target===e.currentTarget)close();}} aria-label={modal?.kind==='enquiry'?'Prepare your photography enquiry':modal?.kind==='film'?'Wedding film player':'Photograph viewer'}><button className="close-modal" onClick={close} aria-label="Close dialog"><X/></button>{modal?.kind==='photo'&&<div className="lightbox"><img src={media(photos[modal.index].src)} alt={photos[modal.index].title}/><div><button aria-label="Previous photograph" onClick={()=>setModal({...modal,index:(modal.index+photos.length-1)%photos.length})}><ArrowLeft/></button><span>{photos[modal.index].title}<small>{modal.index+1} / {photos.length}</small></span><button aria-label="Next photograph" onClick={()=>setModal({...modal,index:(modal.index+1)%photos.length})}><ArrowRight/></button></div></div>}{modal?.kind==='film'&&<div className="video-modal"><video key={modal.index} controls autoPlay playsInline preload="metadata" poster={media(films[modal.index].poster)}><source src={`/media/${films[modal.index].src}.mp4`} type="video/mp4"/>Your browser does not support HTML video.</video><p>{films[modal.index].title} <span>Concept film · Stock footage</span></p></div>}{modal?.kind==='enquiry'&&<div className="enquiry"><p className="eyebrow">LET’S BEGIN SOMETHING BEAUTIFUL</p><h2>Your story,<br/><em>starts here.</em></h2>{draft?<div className="draft-confirm" role="status"><h3>Your brief is ready.</h3><p>Review it in your email app, then send it to Beast Click.</p><a className="solid-button" href={`mailto:bcphotographer19@gmail.com?subject=${encodeURIComponent('Beast Click enquiry')}&body=${encodeURIComponent(draft)}`}>Email your brief <ArrowUpRight size={18}/></a><a className="text-link download-brief" href={`data:text/plain;charset=utf-8,${encodeURIComponent(draft)}`} download="beast-click-enquiry.txt">Download a copy <ArrowDown size={16}/></a><button className="text-link" onClick={()=>setDraft('')}>Write another brief</button></div>:<form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);setDraft(`PHOTOGRAPHY ENQUIRY\n\nName: ${data.get('name')}\nEmail: ${data.get('email')}\nStory: ${data.get('type')}\nDate: ${data.get('date')||'Flexible'}\nLocation: ${data.get('location')}\n\n${data.get('message')}\n\nPrepared with Beast Click. This is an enquiry brief, not a booking.`);}}><div className="form-row"><label>Your name<input name="name" required autoComplete="name" placeholder="The name behind the story"/></label><label>Email address<input name="email" type="email" required autoComplete="email" placeholder="you@example.com"/></label></div><div className="form-row"><label>The occasion<select name="type"><option>Wedding</option><option>Couple session</option><option>Portraits</option><option>Something else</option></select></label><label>A date in mind<input type="date" name="date"/></label></div><label>Where will your story happen?<input name="location" required placeholder="City, venue, or somewhere you love"/></label><label>A little about your vision<textarea name="message" rows={3} placeholder="Tell us about the feeling you want to remember…"/></label><button className="solid-button" type="submit">Prepare my enquiry <ArrowUpRight size={18}/></button><p className="form-note">Your enquiry opens in your email app. It is sent only when you choose Send.</p></form>}</div>}</dialog>
+    <dialog ref={dialog} className={'modal '+(modal?.kind==='enquiry'?'enquiry-modal':'')} onCancel={close} onClick={e=>{if(e.target===e.currentTarget)close();}} aria-label={modal?.kind==='enquiry'?'Prepare your photography enquiry':modal?.kind==='film'?'Wedding film player':'Photograph viewer'}><button className="close-modal" onClick={close} aria-label="Close dialog"><X/></button>{modal?.kind==='photo'&&<div className="lightbox"><img src={media(photos[modal.index].src)} alt={photos[modal.index].title}/><div><button aria-label="Previous photograph" onClick={()=>setModal({...modal,index:(modal.index+photos.length-1)%photos.length})}><ArrowLeft/></button><span>{photos[modal.index].title}<small>{modal.index+1} / {photos.length}</small></span><button aria-label="Next photograph" onClick={()=>setModal({...modal,index:(modal.index+1)%photos.length})}><ArrowRight/></button></div></div>}{modal?.kind==='film'&&<div className="video-modal"><video key={modal.index} controls autoPlay muted={compact} playsInline preload="metadata" poster={media(films[modal.index].poster)}><source src={`/media/${films[modal.index].src}.mp4`} type="video/mp4"/>Your browser does not support HTML video.</video><p>{films[modal.index].title} <span>Concept film · Stock footage</span></p></div>}{modal?.kind==='enquiry'&&<div className="enquiry"><p className="eyebrow">LET’S BEGIN SOMETHING BEAUTIFUL</p><h2>Your story,<br/><em>starts here.</em></h2>{draft?<div className="draft-confirm" role="status"><h3>Your brief is ready.</h3><p>Review it in your email app, then send it to Beast Click.</p><a className="solid-button" href={`mailto:bcphotographer19@gmail.com?subject=${encodeURIComponent('Beast Click enquiry')}&body=${encodeURIComponent(draft)}`}>Email your brief <ArrowUpRight size={18}/></a><a className="text-link download-brief" href={`data:text/plain;charset=utf-8,${encodeURIComponent(draft)}`} download="beast-click-enquiry.txt">Download a copy <ArrowDown size={16}/></a><button className="text-link" onClick={()=>setDraft('')}>Write another brief</button></div>:<form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);setDraft(`PHOTOGRAPHY ENQUIRY\n\nName: ${data.get('name')}\nEmail: ${data.get('email')}\nStory: ${data.get('type')}\nDate: ${data.get('date')||'Flexible'}\nLocation: ${data.get('location')}\n\n${data.get('message')}\n\nPrepared with Beast Click. This is an enquiry brief, not a booking.`);}}><div className="form-row"><label>Your name<input name="name" required autoComplete="name" placeholder="The name behind the story"/></label><label>Email address<input name="email" type="email" required autoComplete="email" placeholder="you@example.com"/></label></div><div className="form-row"><label>The occasion<select name="type"><option>Wedding</option><option>Couple session</option><option>Portraits</option><option>Something else</option></select></label><label>A date in mind<input type="date" name="date"/></label></div><label>Where will your story happen?<input name="location" required placeholder="City, venue, or somewhere you love"/></label><label>A little about your vision<textarea name="message" rows={3} placeholder="Tell us about the feeling you want to remember…"/></label><button className="solid-button" type="submit">Prepare my enquiry <ArrowUpRight size={18}/></button><p className="form-note">Your enquiry opens in your email app. It is sent only when you choose Send.</p></form>}</div>}</dialog>
   </>;
 }
