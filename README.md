@@ -1,4 +1,4 @@
-# Frame by Frame
+# Beast Click
 
 A Next.js App Router photography portfolio with a scroll-driven couple → photographer → lens → flash → framed print → open album sequence.
 
@@ -16,13 +16,13 @@ npm run typecheck
 npm run build
 ```
 
-The production site exports to `out/`. Serve it with any static host, or remove `output: 'export'` from `next.config.ts` to use Next.js server hosting. No server round trips are required for the scroll sequence. Images and fonts are local, videos load only when opened, and scroll updates use requestAnimationFrame and CSS transforms rather than per-frame React renders.
+The production site exports to `out/`. Serve it with any static host, or remove `output: 'export'` from `next.config.ts` to use Next.js server hosting. No server round trips are required for the scroll sequence. Images and fonts are local, video files use deferred loading, and desktop scroll updates use requestAnimationFrame and CSS transforms rather than per-frame React renders. On phones, the story keeps its pinned scroll animation with a shorter timeline and video previews stay paused.
 
 ## Client handoff
 
 - Replace the illustrative stock photography and films in `public/media/` with licensed client work.
 - Update brand, copy, metadata, and the gallery data in `app/page.tsx` and `app/layout.tsx`.
-- The enquiry form currently validates and downloads a brief. It does **not** send mail, create a booking, or store enquiries. Connect a real delivery service before launching a client booking campaign.
+- The enquiry form prepares a message in the visitor’s email app and can also download a copy. The visitor chooses whether to send it; no enquiries are stored and no booking is created.
 - Gentle mode disables the flash and large transforms. System reduced-motion preferences are respected automatically.
 - Navigation, chapter controls, gallery filtering, album turning, lightbox, native video controls, FAQs, and the downloadable enquiry are implemented.
 - Instagram references were inaccessible during development; the animation follows the supplied written storyboard.
